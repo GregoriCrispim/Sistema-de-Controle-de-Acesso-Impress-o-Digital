@@ -1,0 +1,74 @@
+services:
+
+  # PHP-FPM (Laravel Application)
+  php_alunobem:
+    build:
+      context: ./docker/php
+    container_name: php_alunobem
+    volumes:
+      - ./volume_app:/var/www/
+    restart: unless-stopped
+    depends_on:
+      mysql_alunobem:
+        condition: service_healthy
+    environment:
+      APP_NAME: AlunoBem
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8080
+      DB_CONNECTION: mysql
+      DB_HOST: mysql_alunobem
+      DB_PORT: 3306
+      DB_DATABASE: alunobem
+      DB_USERNAME: alunobem
+      DB_PASSWORD: alunobem_secret
+    networks:
+      - network_alunobem
+
+  # Nginx (Web Server)
+  nginx_alunobem:
+    image: nginx:stable-alpine3.21
+    container_name: nginx_alunobem
+    volumes:
+      - ./docker/nginx/:/etc/nginx/conf.d/
+      - ./volume_app:/var/www/
+    ports:
+      - "80:80"
+      - "8080:80"
+      - "8000:80"
+    networks:
+      - network_alunobem
+    depends_on:
+      php_alunobem:
+        condition: service_started
+
+  # MySQL 8
+  mysql_alunobem:
+    image: mysql:8.0
+    container_name: mysql_alunobem
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: alunobem
+      MYSQL_USER: alunobem
+      MYSQL_PASSWORD: alunobem_secret
+      MYSQL_ROOT_PASSWORD: root_secret
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - network_alunobem
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  network_alunobem:
+    driver: bridge
+    name: network_alunobem
+
+volumes:
+  mysql_data:
+    driver: local
