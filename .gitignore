@@ -59,3 +59,6 @@ volume_app/storage/pail
 # --- Docker / local overrides ----------------------------------------------
 docker-compose.override.yml
 
+# Local runtime artifacts
+volume_app/supervisord.pid
+
