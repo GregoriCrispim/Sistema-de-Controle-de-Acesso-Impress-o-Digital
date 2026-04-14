@@ -13,7 +13,7 @@ class FingerprintController extends Controller
     public function store(Request $request, Student $student)
     {
         $request->validate([
-            'template_code' => 'required|string|unique:fingerprints,template_code',
+            'template_code' => 'required|string',
             'finger_index' => 'required|integer|between:1,10',
         ]);
 
@@ -21,10 +21,18 @@ class FingerprintController extends Controller
             return back()->withErrors(['finger' => 'Máximo de 3 digitais por aluno.']);
         }
 
-        $student->fingerprints()->create([
-            'template_code' => $request->template_code,
-            'finger_index' => $request->finger_index,
-        ]);
+        $existingFinger = $student->fingerprints()
+            ->where('finger_index', $request->finger_index)
+            ->first();
+
+        if ($existingFinger) {
+            $existingFinger->update(['template_code' => $request->template_code]);
+        } else {
+            $student->fingerprints()->create([
+                'template_code' => $request->template_code,
+                'finger_index' => $request->finger_index,
+            ]);
+        }
 
         AuditLog::create([
             'user_id' => auth()->id(),

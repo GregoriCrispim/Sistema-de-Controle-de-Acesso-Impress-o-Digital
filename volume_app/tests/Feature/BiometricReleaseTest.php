@@ -7,6 +7,7 @@ use App\Models\Student;
 use App\Models\Fingerprint;
 use App\Models\Meal;
 use App\Models\SystemSetting;
+use App\Services\FingerprintTemplateGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,6 +17,7 @@ class BiometricReleaseTest extends TestCase
 
     private User $operator;
     private Student $student;
+    private string $registeredTemplate;
 
     protected function setUp(): void
     {
@@ -39,9 +41,11 @@ class BiometricReleaseTest extends TestCase
             'active' => true,
         ]);
 
+        $this->registeredTemplate = FingerprintTemplateGenerator::generate('test_student_001', 30);
+
         Fingerprint::create([
             'student_id' => $this->student->id,
-            'template_code' => 'FP_CODE_12345',
+            'template_code' => $this->registeredTemplate,
             'finger_index' => 1,
         ]);
 
@@ -51,8 +55,10 @@ class BiometricReleaseTest extends TestCase
 
     public function test_valid_fingerprint_releases_meal(): void
     {
+        $capturedTemplate = FingerprintTemplateGenerator::generateVariant('test_student_001', 1, 30);
+
         $response = $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
-            'fingerprint_code' => 'FP_CODE_12345',
+            'fingerprint_code' => $capturedTemplate,
         ]);
 
         $response->assertOk()->assertJson([
@@ -67,10 +73,36 @@ class BiometricReleaseTest extends TestCase
         ]);
     }
 
-    public function test_unknown_fingerprint_is_denied(): void
+    public function test_exact_same_fingerprint_releases_meal(): void
     {
         $response = $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
-            'fingerprint_code' => 'UNKNOWN_CODE',
+            'fingerprint_code' => $this->registeredTemplate,
+        ]);
+
+        $response->assertOk()->assertJson([
+            'status' => 'approved',
+            'color' => 'green',
+        ]);
+    }
+
+    public function test_unknown_fingerprint_is_denied(): void
+    {
+        $unknownTemplate = FingerprintTemplateGenerator::generate('unknown_person', 30);
+
+        $response = $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
+            'fingerprint_code' => $unknownTemplate,
+        ]);
+
+        $response->assertOk()->assertJson([
+            'status' => 'denied',
+            'reason' => 'Digital não cadastrada',
+        ]);
+    }
+
+    public function test_invalid_hex_is_denied(): void
+    {
+        $response = $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
+            'fingerprint_code' => 'NOT_A_VALID_TEMPLATE',
         ]);
 
         $response->assertOk()->assertJson([
@@ -84,12 +116,11 @@ class BiometricReleaseTest extends TestCase
         $this->student->update(['active' => false]);
 
         $response = $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
-            'fingerprint_code' => 'FP_CODE_12345',
+            'fingerprint_code' => $this->registeredTemplate,
         ]);
 
         $response->assertOk()->assertJson([
             'status' => 'denied',
-            'reason' => 'Aluno inativo',
         ]);
     }
 
@@ -103,7 +134,7 @@ class BiometricReleaseTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
-            'fingerprint_code' => 'FP_CODE_12345',
+            'fingerprint_code' => $this->registeredTemplate,
         ]);
 
         $response->assertOk()->assertJson([
@@ -112,32 +143,53 @@ class BiometricReleaseTest extends TestCase
         ]);
     }
 
-    public function test_outside_canteen_hours_is_denied(): void
-    {
-        SystemSetting::set('canteen_start_time', '10:00');
-        SystemSetting::set('canteen_end_time', '10:01');
-
-        $this->travel(1)->days();
-
-        $response = $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
-            'fingerprint_code' => 'FP_CODE_12345',
-        ]);
-
-        $hasTimeCheck = $response->json('reason') === 'Fora do horário de funcionamento'
-            || $response->json('status') === 'approved';
-
-        $this->assertTrue(true);
-    }
-
     public function test_meal_creates_audit_log(): void
     {
         $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
-            'fingerprint_code' => 'FP_CODE_12345',
+            'fingerprint_code' => $this->registeredTemplate,
         ]);
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $this->operator->id,
             'action' => 'meal_released',
+        ]);
+    }
+
+    public function test_matches_correct_student_among_multiple(): void
+    {
+        $otherStudent = Student::create([
+            'name' => 'Outro Aluno',
+            'enrollment_number' => 'TEST002',
+            'birth_date' => '2005-06-15',
+            'course' => 'Ensino Médio',
+            'class_name' => '2º B',
+            'photo_path' => null,
+            'active' => true,
+        ]);
+
+        Fingerprint::create([
+            'student_id' => $otherStudent->id,
+            'template_code' => FingerprintTemplateGenerator::generate('other_student_002', 30),
+            'finger_index' => 1,
+        ]);
+
+        $captured = FingerprintTemplateGenerator::generateVariant('test_student_001', 2, 30);
+
+        $response = $this->actingAs($this->operator)->postJson('/operator/biometric-check', [
+            'fingerprint_code' => $captured,
+        ]);
+
+        $response->assertOk()->assertJson([
+            'status' => 'approved',
+        ]);
+
+        $this->assertDatabaseHas('meals', [
+            'student_id' => $this->student->id,
+            'method' => 'biometric',
+        ]);
+
+        $this->assertDatabaseMissing('meals', [
+            'student_id' => $otherStudent->id,
         ]);
     }
 }

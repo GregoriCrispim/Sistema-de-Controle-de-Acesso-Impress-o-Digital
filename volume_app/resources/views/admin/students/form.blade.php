@@ -71,37 +71,56 @@
         </form>
     </div>
 
-    <div class="bg-white rounded-xl shadow p-6 mt-6">
+    <div x-data="{ templateCode: '' }" class="bg-white rounded-xl shadow p-6 mt-6">
         <h2 class="text-lg font-semibold text-gray-700 mb-4">Impressões Digitais ({{ $student->fingerprints->count() }}/3)</h2>
-        
+
         @if($student->fingerprints->count() < 3)
-        <form method="POST" action="{{ route('admin.fingerprints.store', $student) }}" class="flex items-end gap-4 mb-4">
+        <form method="POST" action="{{ route('admin.fingerprints.store', $student) }}" class="space-y-3 mb-4">
             @csrf
-            <div class="flex-1">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Código da Digital</label>
-                <input type="text" name="template_code" required class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Insira o código do template...">
+            <div class="flex items-end gap-4">
+                <div class="flex-1">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Template da Digital (HEX)</label>
+                    <input type="text" name="template_code" x-model="templateCode" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs"
+                           placeholder="Clique aqui e use o leitor biométrico para colar o código HEX...">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Dedo</label>
+                    <select name="finger_index" required class="px-3 py-2 border border-gray-300 rounded-lg">
+                        @php
+                            $usedFingers = $student->fingerprints->pluck('finger_index')->toArray();
+                            $fingerNames = [1 => 'Polegar Dir.', 2 => 'Indicador Dir.', 3 => 'Médio Dir.', 4 => 'Anelar Dir.', 5 => 'Mínimo Dir.', 6 => 'Polegar Esq.', 7 => 'Indicador Esq.', 8 => 'Médio Esq.', 9 => 'Anelar Esq.', 10 => 'Mínimo Esq.'];
+                        @endphp
+                        @for($i = 1; $i <= 10; $i++)
+                            @if(!in_array($i, $usedFingers))
+                                <option value="{{ $i }}">{{ $fingerNames[$i] }}</option>
+                            @endif
+                        @endfor
+                    </select>
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">Dedo</label>
-                <select name="finger_index" required class="px-3 py-2 border border-gray-300 rounded-lg">
-                    @for($i = 1; $i <= 10; $i++)
-                        <option value="{{ $i }}">Dedo {{ $i }}</option>
-                    @endfor
-                </select>
+            <div class="flex gap-3">
+                <button type="submit" :disabled="!templateCode"
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition">
+                    <i class="bi bi-save mr-1"></i>Salvar Digital
+                </button>
             </div>
-            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Cadastrar</button>
+            <div x-show="templateCode.length > 0" x-cloak class="text-xs text-gray-500">
+                Tamanho: <span x-text="templateCode.length"></span> caracteres HEX
+            </div>
         </form>
         @endif
 
         @foreach($student->fingerprints as $fp)
         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
             <div>
-                <span class="font-medium">Dedo {{ $fp->finger_index }}</span>
-                <span class="text-sm text-gray-500 ml-2">{{ Str::limit($fp->template_code, 30) }}</span>
+                <span class="font-medium">{{ $fingerNames[$fp->finger_index] ?? 'Dedo ' . $fp->finger_index }}</span>
+                <span class="text-xs text-gray-400 ml-2 font-mono">{{ Str::limit($fp->template_code, 40) }}</span>
+                <span class="text-xs text-gray-400 ml-1">({{ strlen($fp->template_code) }} chars)</span>
             </div>
             <form method="POST" action="{{ route('admin.fingerprints.destroy', [$student, $fp]) }}" onsubmit="return confirm('Remover esta digital?')">
                 @csrf @method('DELETE')
-                <button type="submit" class="text-red-600 hover:text-red-800 text-sm">Remover</button>
+                <button type="submit" class="text-red-600 hover:text-red-800 text-sm"><i class="bi bi-trash mr-1"></i>Remover</button>
             </form>
         </div>
         @endforeach

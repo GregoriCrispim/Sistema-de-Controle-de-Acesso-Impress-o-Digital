@@ -10,8 +10,11 @@ class Fingerprint extends Model
 
     public function student() { return $this->belongsTo(Student::class); }
 
-    public static function findByTemplate(string $templateCode): ?self
+    public static function getAllTemplatesForMatching(): array
     {
-        return static::where('template_code', $templateCode)->first();
+        return static::select('id', 'student_id', 'template_code')
+            ->whereHas('student', fn ($q) => $q->where('active', true))
+            ->get()
+            ->toArray();
     }
 }

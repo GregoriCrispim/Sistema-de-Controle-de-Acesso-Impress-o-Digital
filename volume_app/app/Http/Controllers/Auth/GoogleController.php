@@ -25,13 +25,18 @@ class GoogleController extends Controller
             return redirect()->route('login')->withErrors(['google' => 'Erro ao autenticar com Google.']);
         }
 
-        $user = User::where('google_id', $googleUser->getId())
-            ->orWhere('email', $googleUser->getEmail())
+        $googleEmail = strtolower((string) $googleUser->getEmail());
+
+        $user = User::where('role', 'fiscal')
+            ->where(function ($query) use ($googleUser, $googleEmail) {
+                $query->where('google_id', $googleUser->getId())
+                    ->orWhere('email', $googleEmail);
+            })
             ->first();
 
         if (!$user) {
             return redirect()->route('login')
-                ->withErrors(['google' => 'Nenhuma conta encontrada para este e-mail. Contate o administrador.']);
+                ->withErrors(['google' => 'Acesso negado. Conta Google não autorizada.']);
         }
 
         if (!$user->active) {

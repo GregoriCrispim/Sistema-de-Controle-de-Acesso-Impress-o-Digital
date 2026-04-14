@@ -55,9 +55,6 @@
             </a>
         </div>
 
-        @if(session('message'))
-            <p class="mt-4 text-center text-sm text-amber-600">{{ session('message') }}</p>
-        @endif
     </div>
 </div>
 @endsection

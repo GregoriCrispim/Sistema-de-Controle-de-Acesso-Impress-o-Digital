@@ -15,8 +15,8 @@
                 <input type="number" name="year" value="{{ $year }}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-24">
                 <button type="submit" class="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Buscar</button>
             </form>
-            <a href="{{ route('reports.monthly', ['month' => $month, 'year' => $year, 'format' => 'csv']) }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">CSV</a>
-            <a href="{{ route('reports.monthly', ['month' => $month, 'year' => $year, 'format' => 'pdf']) }}" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">PDF</a>
+            <a href="{{ route('reports.monthly', ['month' => $month, 'year' => $year, 'format' => 'pdf']) }}" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">Exportar PDF</a>
+            <a href="{{ route('reports.monthly', ['month' => $month, 'year' => $year, 'format' => 'csv']) }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Exportar CSV</a>
         </div>
     </div>
 

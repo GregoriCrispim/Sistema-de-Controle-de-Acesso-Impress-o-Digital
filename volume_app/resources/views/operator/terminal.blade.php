@@ -59,9 +59,8 @@
                 <p class="text-xl text-gray-500">Posicione o dedo no leitor biométrico</p>
                 <input type="text" x-ref="fingerprintInput" x-model="fingerprintCode"
                        @input="onFingerprintInput()"
-                       @keydown.enter="checkBiometric()"
                        class="mt-6 w-96 px-6 py-4 text-center text-2xl border-2 border-indigo-300 rounded-xl focus:ring-4 focus:ring-indigo-400 focus:border-indigo-500 outline-none"
-                       placeholder="Código da digital..."
+                       placeholder="Aguardando digital..."
                        autofocus>
                 <div x-show="processing" x-cloak class="mt-4 text-indigo-500">
                     <i class="bi bi-arrow-repeat animate-spin inline-block text-2xl"></i>
@@ -258,9 +257,6 @@ function terminalApp() {
         },
 
         onFingerprintInput() {
-            // The local fingerprint reader pastes the code into the field.
-            // We wait for the input to stabilize (no new characters for 400ms),
-            // then auto-submit. This handles both paste and rapid sequential typing.
             if (this.inputTimer) clearTimeout(this.inputTimer);
             if (!this.fingerprintCode.trim()) return;
 
@@ -299,7 +295,6 @@ function terminalApp() {
                         body: JSON.stringify({ fingerprint_code: this.fingerprintCode })
                     });
                     const data = await res.json();
-
                     this.processing = false;
 
                     if (data.status === 'approved') {
@@ -351,10 +346,7 @@ function terminalApp() {
                 return;
             }
 
-            await OfflineManager.saveMealOffline({
-                student_id: student.id,
-                method: 'biometric',
-            });
+            await OfflineManager.saveMealOffline({ student_id: student.id, method: 'biometric' });
 
             this.pendingOfflineCount = (await OfflineManager.getPendingMeals()).length;
             this.todayCount++;

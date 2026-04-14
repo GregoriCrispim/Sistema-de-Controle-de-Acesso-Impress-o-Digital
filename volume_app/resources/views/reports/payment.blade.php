@@ -3,7 +3,13 @@
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4">
-    <h1 class="text-2xl font-bold text-gray-800 mb-6">Relatório para Pagamento - Períodos Validados</h1>
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Relatório para Pagamento - Períodos Validados</h1>
+        <div class="flex space-x-2">
+            <a href="{{ route('reports.payment', ['format' => 'pdf']) }}" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">Exportar PDF</a>
+            <a href="{{ route('reports.payment', ['format' => 'csv']) }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Exportar CSV</a>
+        </div>
+    </div>
 
     <div class="bg-white rounded-xl shadow overflow-hidden">
         <table class="w-full">

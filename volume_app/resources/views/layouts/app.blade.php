@@ -15,6 +15,34 @@
     @stack('styles')
 </head>
 <body class="bg-gray-100 min-h-screen">
+    @php
+        $toastNotifications = [];
+
+        if (session('success')) {
+            $toastNotifications[] = [
+                'type' => 'success',
+                'message' => session('success'),
+            ];
+        }
+
+        if (session('message')) {
+            $toastNotifications[] = [
+                'type' => 'info',
+                'message' => session('message'),
+            ];
+        }
+
+        if ($errors->any()) {
+            foreach ($errors->all() as $error) {
+                $toastNotifications[] = [
+                    'type' => 'error',
+                    'message' => $error,
+                    'duration' => 7000,
+                ];
+            }
+        }
+    @endphp
+
     @auth
     <nav class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -53,30 +81,128 @@
     </nav>
     @endauth
 
-    @if(session('success'))
-        <div class="max-w-7xl mx-auto mt-4 px-4" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)">
-            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
-                {{ session('success') }}
-                <button @click="show = false" class="absolute top-0 right-0 px-4 py-3">&times;</button>
-            </div>
-        </div>
-    @endif
+    <div
+        x-cloak
+        x-data='toastNotifications(@json($toastNotifications))'
+        class="fixed top-4 right-4 z-[100] w-full max-w-sm space-y-3 px-4 sm:px-0 pointer-events-none"
+    >
+        <template x-for="toast in toasts" :key="toast.id">
+            <div
+                x-show="toast.visible"
+                x-transition:enter="transform ease-out duration-300"
+                x-transition:enter-start="translate-x-8 opacity-0"
+                x-transition:enter-end="translate-x-0 opacity-100"
+                x-transition:leave="transform ease-in duration-200"
+                x-transition:leave-start="translate-x-0 opacity-100"
+                x-transition:leave-end="translate-x-8 opacity-0"
+                class="pointer-events-auto overflow-hidden rounded-xl border bg-white shadow-lg ring-1 ring-black/5"
+                :class="toast.borderClass"
+            >
+                <div class="flex items-start gap-3 p-4">
+                    <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold" :class="toast.iconClass">
+                        <span x-text="toast.icon"></span>
+                    </div>
 
-    @if($errors->any())
-        <div class="max-w-7xl mx-auto mt-4 px-4">
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                <ul class="list-disc pl-5">
-                    @foreach($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-gray-900" x-text="toast.title"></p>
+                        <p class="mt-1 text-sm text-gray-600 break-words" x-text="toast.message"></p>
+                    </div>
+
+                    <button
+                        type="button"
+                        @click="removeToast(toast.id)"
+                        class="shrink-0 text-gray-400 transition hover:text-gray-600"
+                        aria-label="Fechar notificação"
+                    >
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
             </div>
-        </div>
-    @endif
+        </template>
+    </div>
 
     <main class="@auth py-6 @endauth">
         @yield('content')
     </main>
+
+    <script>
+        function toastNotifications(initialToasts = []) {
+            return {
+                toasts: [],
+                nextId: 1,
+
+                init() {
+                    initialToasts.forEach((toast) => this.addToast(toast));
+
+                    window.addEventListener('app-toast', (event) => {
+                        this.addToast(event.detail || {});
+                    });
+                },
+
+                addToast({ message = '', type = 'info', duration = 5000 } = {}) {
+                    if (!message) {
+                        return;
+                    }
+
+                    const styles = {
+                        success: {
+                            title: 'Sucesso',
+                            icon: '✓',
+                            iconClass: 'bg-green-100 text-green-700',
+                            borderClass: 'border-green-200',
+                        },
+                        error: {
+                            title: 'Erro',
+                            icon: '!',
+                            iconClass: 'bg-red-100 text-red-700',
+                            borderClass: 'border-red-200',
+                        },
+                        info: {
+                            title: 'Aviso',
+                            icon: 'i',
+                            iconClass: 'bg-blue-100 text-blue-700',
+                            borderClass: 'border-blue-200',
+                        },
+                    };
+
+                    const toastType = styles[type] ? type : 'info';
+                    const toast = {
+                        id: this.nextId++,
+                        message,
+                        visible: true,
+                        duration,
+                        ...styles[toastType],
+                    };
+
+                    this.toasts.push(toast);
+
+                    window.setTimeout(() => {
+                        this.removeToast(toast.id);
+                    }, toast.duration);
+                },
+
+                removeToast(id) {
+                    const toast = this.toasts.find((item) => item.id === id);
+
+                    if (!toast) {
+                        return;
+                    }
+
+                    toast.visible = false;
+
+                    window.setTimeout(() => {
+                        this.toasts = this.toasts.filter((item) => item.id !== id);
+                    }, 220);
+                },
+            };
+        }
+
+        window.appToast = function (message, type = 'info', options = {}) {
+            window.dispatchEvent(new CustomEvent('app-toast', {
+                detail: { message, type, ...options },
+            }));
+        };
+    </script>
 
     @stack('scripts')
 </body>

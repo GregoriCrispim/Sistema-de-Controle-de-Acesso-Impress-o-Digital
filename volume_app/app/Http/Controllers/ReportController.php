@@ -201,11 +201,33 @@ class ReportController extends Controller
         return view('reports.exceptions', $data);
     }
 
-    public function payment()
+    public function payment(Request $request)
     {
-        $validations = FiscalValidation::with('fiscal')
-            ->orderByDesc('validated_at')
-            ->paginate(20);
+        $query = FiscalValidation::with('fiscal')
+            ->orderByDesc('validated_at');
+
+        $format = $request->get('format');
+
+        if (in_array($format, ['pdf', 'csv'], true)) {
+            $validations = (clone $query)->get();
+            $data = [
+                'title' => 'Relatório para Pagamento',
+                'validations' => $validations,
+                'generated_at' => now()->format('d/m/Y H:i'),
+                'total_periods' => $validations->count(),
+                'total_meals' => $validations->sum('total_meals'),
+                'total_amount' => $validations->sum(fn ($validation) => (float) $validation->total_value),
+            ];
+
+            if ($format === 'pdf') {
+                $pdf = Pdf::loadView('reports.payment-pdf', $data);
+                return $pdf->download('relatorio-pagamentos.pdf');
+            }
+
+            return $this->exportPaymentCsv($validations, 'relatorio-pagamentos.csv');
+        }
+
+        $validations = $query->paginate(20);
 
         return view('reports.payment', [
             'title' => 'Relatório para Pagamento',
@@ -289,6 +311,36 @@ class ReportController extends Controller
                     $stat['total'],
                     $stat['biometric'],
                     $stat['manual'],
+                ], ';');
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    protected function exportPaymentCsv($validations, string $filename)
+    {
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename={$filename}",
+        ];
+
+        $callback = function () use ($validations) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            fputcsv($file, ['Protocolo', 'Período', 'Almoços', 'Valor Unitário', 'Valor Total', 'Fiscal', 'Validado em'], ';');
+
+            foreach ($validations as $validation) {
+                fputcsv($file, [
+                    $validation->protocol_number,
+                    $validation->period_start->format('d/m/Y') . ' - ' . $validation->period_end->format('d/m/Y'),
+                    $validation->total_meals,
+                    number_format((float) $validation->meal_value, 2, ',', '.'),
+                    number_format((float) $validation->total_value, 2, ',', '.'),
+                    $validation->fiscal->name ?? 'N/A',
+                    $validation->validated_at->format('d/m/Y H:i'),
                 ], ';');
             }
 

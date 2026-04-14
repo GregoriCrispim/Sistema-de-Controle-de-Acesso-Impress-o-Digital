@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\Student;
 use App\Models\Meal;
+use App\Models\FiscalValidation;
 use App\Models\SystemSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -41,6 +42,19 @@ class ReportTest extends TestCase
             'operator_id' => $this->admin->id,
             'method' => 'biometric',
             'served_at' => now()->setHour(12),
+        ]);
+
+        FiscalValidation::create([
+            'fiscal_id' => $this->admin->id,
+            'period_start' => now()->startOfMonth()->toDateString(),
+            'period_end' => now()->endOfMonth()->toDateString(),
+            'total_meals' => 10,
+            'meal_value' => 15.00,
+            'total_value' => 150.00,
+            'biometric_count' => 9,
+            'manual_count' => 1,
+            'protocol_number' => 'VAL-REPORT-001',
+            'validated_at' => now(),
         ]);
     }
 
@@ -133,5 +147,14 @@ class ReportTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/reports/payment')
             ->assertOk();
+    }
+
+    public function test_payment_report_csv_export(): void
+    {
+        $response = $this->actingAs($this->admin)
+            ->get('/reports/payment?format=csv');
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
     }
 }

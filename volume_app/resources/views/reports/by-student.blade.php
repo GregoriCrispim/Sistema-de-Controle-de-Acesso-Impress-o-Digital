@@ -6,8 +6,8 @@
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Relatório - {{ $student->name }}</h1>
         <div class="flex space-x-2">
-            <a href="{{ route('reports.by-student', ['student_id' => $student->id, 'format' => 'csv']) }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">CSV</a>
-            <a href="{{ route('reports.by-student', ['student_id' => $student->id, 'format' => 'pdf']) }}" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">PDF</a>
+            <a href="{{ route('reports.by-student', ['student_id' => $student->id, 'format' => 'pdf']) }}" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">Exportar PDF</a>
+            <a href="{{ route('reports.by-student', ['student_id' => $student->id, 'format' => 'csv']) }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Exportar CSV</a>
         </div>
     </div>
 

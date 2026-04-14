@@ -7,6 +7,7 @@ use App\Models\Fingerprint;
 use App\Models\Meal;
 use App\Models\Occurrence;
 use App\Models\User;
+use App\Services\FingerprintTemplateGenerator;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
@@ -58,18 +59,16 @@ class TestDataSeeder extends Seeder
                 'active' => true,
             ]);
 
-            $fingerprintCode = 'FP-' . $data['enrollment_number'] . '-D1';
             Fingerprint::create([
                 'student_id' => $student->id,
-                'template_code' => $fingerprintCode,
+                'template_code' => FingerprintTemplateGenerator::generate($data['enrollment_number'] . '_finger1', 30),
                 'finger_index' => 1,
             ]);
 
             if ($index < 10) {
-                $secondCode = 'FP-' . $data['enrollment_number'] . '-D2';
                 Fingerprint::create([
                     'student_id' => $student->id,
-                    'template_code' => $secondCode,
+                    'template_code' => FingerprintTemplateGenerator::generate($data['enrollment_number'] . '_finger2', 30),
                     'finger_index' => 2,
                 ]);
             }

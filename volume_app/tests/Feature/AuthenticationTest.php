@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Socialite\Facades\Socialite;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -107,5 +108,70 @@ class AuthenticationTest extends TestCase
         $this->assertDatabaseHas('login_logs', [
             'user_id' => $user->id,
         ]);
+    }
+
+    public function test_fiscal_google_login_accepts_configured_email(): void
+    {
+        $fiscal = User::create([
+            'name' => 'Fiscal',
+            'email' => 'gregoridesbravador@gmail.com',
+            'password' => bcrypt('password123'),
+            'role' => 'fiscal',
+            'active' => true,
+        ]);
+
+        Socialite::shouldReceive('driver->user')
+            ->once()
+            ->andReturn($this->fakeGoogleUser('gregoridesbravador@gmail.com'));
+
+        $response = $this->get('/auth/google/callback');
+
+        $response->assertRedirect('/fiscal/dashboard');
+        $this->assertAuthenticatedAs($fiscal);
+    }
+
+    public function test_fiscal_google_login_rejects_other_email(): void
+    {
+        User::create([
+            'name' => 'Fiscal',
+            'email' => 'gregoridesbravador@gmail.com',
+            'password' => bcrypt('password123'),
+            'role' => 'fiscal',
+            'active' => true,
+        ]);
+
+        Socialite::shouldReceive('driver->user')
+            ->once()
+            ->andReturn($this->fakeGoogleUser('outro@email.com'));
+
+        $response = $this->get('/auth/google/callback');
+
+        $response->assertRedirect('/login');
+        $response->assertSessionHasErrors(['google' => 'Acesso negado. Conta Google não autorizada.']);
+        $this->assertGuest();
+    }
+
+    private function fakeGoogleUser(string $email): object
+    {
+        return new class ($email) {
+            public function __construct(private string $email)
+            {
+            }
+
+            public function getId(): string
+            {
+                return 'google-user-123';
+            }
+
+            public function getEmail(): string
+            {
+                return $this->email;
+            }
+
+            public function getAvatar(): string
+            {
+                return 'https://example.com/avatar.png';
+            }
+        };
     }
 }

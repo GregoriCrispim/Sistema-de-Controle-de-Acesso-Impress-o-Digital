@@ -8,6 +8,7 @@ use App\Models\Fingerprint;
 use App\Models\Meal;
 use App\Models\AuditLog;
 use App\Models\SystemSetting;
+use App\Services\FingerprintMatcher;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -24,9 +25,15 @@ class TerminalController extends Controller
     {
         $request->validate(['fingerprint_code' => 'required|string']);
 
-        $fingerprint = Fingerprint::findByTemplate($request->fingerprint_code);
+        $storedFingerprints = Fingerprint::getAllTemplatesForMatching();
 
-        if (!$fingerprint) {
+        $match = FingerprintMatcher::findMatch(
+            $request->fingerprint_code,
+            $storedFingerprints,
+            securityLevel: 4
+        );
+
+        if (!$match) {
             return response()->json([
                 'status' => 'denied',
                 'reason' => 'Digital não cadastrada',
@@ -34,8 +41,21 @@ class TerminalController extends Controller
             ]);
         }
 
-        $student = $fingerprint->student;
+        $student = Student::find($match['student_id']);
 
+        if (!$student) {
+            return response()->json([
+                'status' => 'denied',
+                'reason' => 'Aluno não encontrado',
+                'color' => 'red',
+            ]);
+        }
+
+        return $this->releaseMealForStudent($student, 'biometric', $request);
+    }
+
+    private function releaseMealForStudent(Student $student, string $method, Request $request)
+    {
         if (!$student->active) {
             return response()->json([
                 'status' => 'denied',
@@ -72,7 +92,7 @@ class TerminalController extends Controller
         $meal = Meal::create([
             'student_id' => $student->id,
             'operator_id' => auth()->id(),
-            'method' => 'biometric',
+            'method' => $method,
             'served_at' => now(),
         ]);
 
@@ -81,7 +101,7 @@ class TerminalController extends Controller
             'action' => 'meal_released',
             'details' => [
                 'student_id' => $student->id,
-                'method' => 'biometric',
+                'method' => $method,
                 'meal_id' => $meal->id,
             ],
             'ip_address' => $request->ip(),

@@ -47,18 +47,28 @@ const OfflineManager = {
     },
 
     async getStudent(fingerprint) {
+        const allStudents = await this._getAllStudents();
+        const capturedMinutiae = FingerprintMatcherJS.parseTemplate(fingerprint);
+
+        for (const s of allStudents) {
+            if (!s.fingerprints) continue;
+            for (const fp of s.fingerprints) {
+                const storedMinutiae = FingerprintMatcherJS.parseTemplate(fp.template_code);
+                if (FingerprintMatcherJS.matchMinutiae(capturedMinutiae, storedMinutiae, 0.33)) {
+                    return s;
+                }
+            }
+        }
+        return null;
+    },
+
+    async _getAllStudents() {
         const tx = this.db.transaction('students', 'readonly');
         const store = tx.objectStore('students');
         return new Promise((resolve) => {
             const request = store.getAll();
-            request.onsuccess = () => {
-                const students = request.result;
-                const found = students.find(s =>
-                    s.fingerprints && s.fingerprints.some(fp => fp.template_code === fingerprint)
-                );
-                resolve(found || null);
-            };
-            request.onerror = () => resolve(null);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => resolve([]);
         });
     },
 
@@ -229,4 +239,112 @@ const OfflineManager = {
             return 0;
         }
     }
+};
+
+/**
+ * ISO 19794-2 fingerprint matcher in JavaScript for offline biometric comparison.
+ * Mirrors the PHP FingerprintMatcher logic.
+ */
+const FingerprintMatcherJS = {
+    SPATIAL_TOL: 18,
+    ANGLE_TOL: 16,
+    MAX_ANCHORS: 12,
+
+    parseTemplate(hex) {
+        if (!hex || hex.length < 60 || hex.length % 2 !== 0) return null;
+
+        const bytes = new Uint8Array(hex.match(/.{2}/g).map(b => parseInt(b, 16)));
+        if (bytes.length < 30) return null;
+
+        if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) !== 'FMR') return null;
+
+        const numViews = bytes[22];
+        if (numViews < 1) return null;
+
+        let offset = 24;
+        const numMinutiae = bytes[offset + 3];
+        offset += 4;
+
+        const minutiae = [];
+        for (let i = 0; i < numMinutiae && (offset + 5) < bytes.length; i++) {
+            const w1 = (bytes[offset] << 8) | bytes[offset + 1];
+            const w2 = (bytes[offset + 2] << 8) | bytes[offset + 3];
+
+            minutiae.push({
+                type: (w1 >> 14) & 0x03,
+                x: w1 & 0x3FFF,
+                y: w2 & 0x3FFF,
+                angle: bytes[offset + 4] * 1.40625,
+                quality: bytes[offset + 5],
+            });
+            offset += 6;
+        }
+
+        return minutiae.length >= 3 ? minutiae : null;
+    },
+
+    matchMinutiae(m1, m2, threshold) {
+        if (!m1 || !m2 || m1.length === 0 || m2.length === 0) return false;
+
+        const anchors1 = this._selectAnchors(m1);
+        const anchors2 = this._selectAnchors(m2);
+        const spatialTolSq = this.SPATIAL_TOL * this.SPATIAL_TOL;
+        let bestMatched = 0;
+
+        for (const a1 of anchors1) {
+            for (const a2 of anchors2) {
+                const rotDeg = a1.angle - a2.angle;
+                const rotRad = rotDeg * 0.017453292519943;
+                const cosR = Math.cos(rotRad);
+                const sinR = Math.sin(rotRad);
+
+                const rx = a2.x * cosR - a2.y * sinR;
+                const ry = a2.x * sinR + a2.y * cosR;
+                const tx = a1.x - rx;
+                const ty = a1.y - ry;
+
+                let matched = 0;
+                const used = new Set();
+
+                for (const m of m2) {
+                    const trX = m.x * cosR - m.y * sinR + tx;
+                    const trY = m.x * sinR + m.y * cosR + ty;
+                    const trAngle = ((m.angle + rotDeg) % 360 + 360) % 360;
+
+                    let bestDSq = Infinity;
+                    let bestIdx = -1;
+
+                    for (let k = 0; k < m1.length; k++) {
+                        if (used.has(k)) continue;
+                        const dx = trX - m1[k].x;
+                        const dy = trY - m1[k].y;
+                        const dSq = dx * dx + dy * dy;
+
+                        if (dSq < spatialTolSq && dSq < bestDSq) {
+                            let aDiff = Math.abs(trAngle - m1[k].angle);
+                            if (aDiff > 180) aDiff = 360 - aDiff;
+                            if (aDiff < this.ANGLE_TOL) {
+                                bestDSq = dSq;
+                                bestIdx = k;
+                            }
+                        }
+                    }
+
+                    if (bestIdx >= 0) {
+                        matched++;
+                        used.add(bestIdx);
+                    }
+                }
+
+                if (matched > bestMatched) bestMatched = matched;
+            }
+        }
+
+        return bestMatched / Math.min(m1.length, m2.length) >= threshold;
+    },
+
+    _selectAnchors(minutiae) {
+        if (minutiae.length <= this.MAX_ANCHORS) return minutiae;
+        return [...minutiae].sort((a, b) => b.quality - a.quality).slice(0, this.MAX_ANCHORS);
+    },
 };

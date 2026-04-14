@@ -45,12 +45,12 @@ class DatabaseSeeder extends Seeder
         );
 
         // Fiscal user
-        User::firstOrCreate(
-            ['email' => 'fiscal@alunobem.com'],
+        User::updateOrCreate(
+            ['role' => 'fiscal'],
             [
                 'name' => 'Fiscal Escolar',
+                'email' => 'gregoridesbravador@gmail.com',
                 'password' => Hash::make('fiscal123'),
-                'role' => 'fiscal',
                 'active' => true,
             ]
         );

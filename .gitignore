@@ -1,3 +1,6 @@
+# --- Captura Digital (Windows-only, external to project) --------------------
+Captura_Digital_Suprema/
+
 # --- Secrets / env -----------------------------------------------------------
 **/.env
 **/.env.*

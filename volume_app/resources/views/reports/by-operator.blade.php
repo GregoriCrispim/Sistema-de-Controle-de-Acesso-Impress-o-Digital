@@ -6,8 +6,8 @@
     <div class="flex justify-between items-center mb-2">
         <h1 class="text-2xl font-bold text-gray-800">Relatório por Operador</h1>
         <div class="flex space-x-2">
-            <a href="{{ route('reports.by-operator', ['start_date' => request('start_date'), 'end_date' => request('end_date'), 'format' => 'csv']) }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">CSV</a>
-            <a href="{{ route('reports.by-operator', ['start_date' => request('start_date'), 'end_date' => request('end_date'), 'format' => 'pdf']) }}" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">PDF</a>
+            <a href="{{ route('reports.by-operator', ['start_date' => request('start_date'), 'end_date' => request('end_date'), 'format' => 'pdf']) }}" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">Exportar PDF</a>
+            <a href="{{ route('reports.by-operator', ['start_date' => request('start_date'), 'end_date' => request('end_date'), 'format' => 'csv']) }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Exportar CSV</a>
         </div>
     </div>
     <p class="text-gray-500 mb-6">Período: {{ $start_date }} a {{ $end_date }}</p>

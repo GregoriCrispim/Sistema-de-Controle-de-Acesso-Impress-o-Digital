@@ -129,7 +129,11 @@ function fiscalDash() {
         previewData: null,
 
         async previewPeriod() {
-            if (!this.periodStart || !this.periodEnd) return;
+            if (!this.periodStart || !this.periodEnd) {
+                window.appToast('Selecione a data inicial e final para consultar o período.', 'info');
+                return;
+            }
+
             try {
                 const res = await fetch('{{ route("fiscal.preview.period") }}', {
                     method: 'POST',
@@ -140,9 +144,20 @@ function fiscalDash() {
                     },
                     body: JSON.stringify({ period_start: this.periodStart, period_end: this.periodEnd })
                 });
-                this.previewData = await res.json();
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    const errorMessage = data.message
+                        || Object.values(data.errors || {}).flat()[0]
+                        || 'Erro ao consultar período.';
+
+                    throw new Error(errorMessage);
+                }
+
+                this.previewData = data;
             } catch (e) {
-                alert('Erro ao consultar período.');
+                window.appToast(e.message || 'Erro ao consultar período.', 'error');
             }
         },
 
